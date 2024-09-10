@@ -1,0 +1,114 @@
+---
+- name: Install git , java , maven , tomcat
+  hosts: localhost
+  become: yes
+  vars:
+          tools:
+                  - git
+                  - java-11-openjdk
+                  - maven
+  tasks:
+          - name: Install tools
+            yum:
+                    name: "{{ tools }}"
+                    state: present
+
+          - name: create group tomcat
+            group:
+                    name: tomcat
+                    state: present
+          
+          - name: Create a dedicated Tomcat user
+            user:
+                    name: tomcat
+                    system: yes  # Corresponds to -r (system user)
+                    shell: /bin/false  # Disable login shell
+                    home: /opt/tomcat  # Set home directory
+                    create_home: yes  # Corresponds to -m (create home directory
+                    group: tomcat  # Corresponds to -U (create group)
+      
+          - name: Download Apache Tomcat
+            get_url:
+                    url: https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.28/bin/apache-tomcat-10.1.28.tar.gz
+                    dest: /tmp/apache-tomcat-10.1.28.tar.gz
+                    mode: '0755'
+                    force: yes
+
+          - name: Extract Apache Tomcat archive to /opt/tomcat
+            unarchive:
+                    src: /tmp/apache-tomcat-10.1.28.tar.gz
+                    dest: /opt/tomcat
+                    remote_src: yes
+                    owner: tomcat
+                    group: tomcat
+      
+          - name: Create symbolic link for Tomcat
+            file:
+                    src: /opt/tomcat/apache-tomcat-10.1.28
+                    dest: /opt/tomcat/updated
+                    state: link
+      
+          - name: Change ownership of all files under /opt/tomcat to tomcat user
+            file:
+                    path: /opt/tomcat
+                    state: directory
+                    recurse: yes
+                    owner: tomcat
+                    group: tomcat
+
+          - name: Find all .sh files in /opt/tomcat/updated/bin
+            find:
+                    paths: /opt/tomcat/updated/bin
+                    patterns: "*.sh"
+                    recurse: no  # Avoid searching subdirectories (set to yes if needed
+            register: shell_scripts
+
+          - name: Set executable permission on found .sh files
+            file:
+                    path: "{{ item.path }}"
+                    mode: '0755'
+            loop: "{{ shell_scripts.files }}"
+                    #          - name: Make all shell scripts in /opt/tomcat/updated/bin executable
+            #            file:
+                    #                    path: /opt/tomcat/updated/bin/
+                    #                    mode: '0755'
+                    #                    recurse: yes
+      
+          - name: Create Tomcat systemd service filei
+            copy:
+                    dest: /etc/systemd/system/tomcat.service
+                    content: |
+                            [Unit]
+                            Description=Apache Tomcat Web Application Container
+                            After=network.target
+
+                            [Service]
+                            Type=forking
+                            Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk-11.0.10.0.9-8.el8.x86_64"
+                            Environment="CATALINA_PID=/opt/tomcat/updated/temp/tomcat.pid"
+                            Environment="CATALINA_HOME=/opt/tomcat/updated/"
+                            Environment="CATALINA_BASE=/opt/tomcat/updated/"
+                            Environment="CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC"
+                            Environment="JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom"
+                            ExecStart=/opt/tomcat/updated/bin/startup.sh
+                            ExecStop=/opt/tomcat/updated/bin/shutdown.sh
+                            User=tomcat
+                            Group=tomcat
+                            UMask=0007
+                            RestartSec=10
+                            Restart=always
+
+                            [Install]
+                            WantedBy=multi-user.target
+
+
+          - name: Reload systemd daemon
+            systemd:
+                    daemon_reload: yes
+
+          - name: Start Tomcat service
+            systemd:
+                    name: tomcat
+                    state: started
+                    enabled: yes
+
