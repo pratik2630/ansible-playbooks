@@ -29,14 +29,14 @@
       
           - name: Download Apache Tomcat
             get_url:
-                    url: https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.28/bin/apache-tomcat-10.1.28.tar.gz
-                    dest: /tmp/apache-tomcat-10.1.28.tar.gz
+                    url: https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.29/bin/apache-tomcat-10.1.29.tar.gz
+                    dest: /tmp/apache-tomcat-10.1.29.tar.gz
                     mode: '0755'
                     force: yes
 
           - name: Extract Apache Tomcat archive to /opt/tomcat
             unarchive:
-                    src: /tmp/apache-tomcat-10.1.28.tar.gz
+                    src: /tmp/apache-tomcat-10.1.29.tar.gz
                     dest: /opt/tomcat
                     remote_src: yes
                     owner: tomcat
@@ -44,7 +44,7 @@
       
           - name: Create symbolic link for Tomcat
             file:
-                    src: /opt/tomcat/apache-tomcat-10.1.28
+                    src: /opt/tomcat/apache-tomcat-10.1.29
                     dest: /opt/tomcat/updated
                     state: link
       
@@ -73,7 +73,16 @@
                     #                    path: /opt/tomcat/updated/bin/
                     #                    mode: '0755'
                     #                    recurse: yes
-      
+                    
+
+
+          - name: Replace second occurrence of port 8080 with 8081 in server.xml
+            replace:
+                    path: /opt/tomcat/updated/conf/server.xml
+                    regexp: '<Connector\s+port="8080"\s+protocol="HTTP/1\.1"\s*(?:[^>]*)?>'
+                    replace: '<Connector port="8081" protocol="HTTP/1.1"'
+                    #                    after: '<Connector port="8080"'
+
           - name: Create Tomcat systemd service filei
             copy:
                     dest: /etc/systemd/system/tomcat.service
