@@ -1,0 +1,55 @@
+- name: install jenkins
+  become: yes
+  hosts: localhost
+  tasks:
+         
+          - name: install jenkins
+            get_url:
+                    url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+                    dest: /etc/yum.repos.d/jenkins.repo
+
+                    #          - name: install jenkins
+                    #            yum:
+                    #                    name: jenkins
+                    #                    state: present
+                    #                    update_cache: true
+
+          - name: Import Jenkins GPG key 
+            rpm_key:
+
+                    state: present
+                    key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+          - name: yum upgrade all pkg
+            yum:
+                    name: "*"
+                    state: latest
+
+                    #          - name: Verify Jenkins repo GPG key
+                    #            command: rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+
+          - name: Install Jenkins
+            yum:
+                    name: "{{ jenkins_pkgs}}"
+                       
+
+                    state: present
+            vars:
+                            jenkins_pkgs:
+                                    - fontconfig
+                                    - jenkins
+
+          - name: Start and enable Jenkins service
+            systemd:
+                    name: jenkins
+                    state: started
+                    enabled: yes
+
+          - name: Read Jenkins initial admin password
+            command: cat /var/lib/jenkins/secrets/initialAdminPassword
+            register: password_output
+
+          - name: Display Jenkins initial admin password
+            debug:
+                    msg: "{{ password_output.stdout }}"                  
+
